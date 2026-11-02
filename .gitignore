@@ -1,0 +1,33 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+local.properties
+
+# Kotlin
+.kotlin/
+
+# Rust / Cargo
+# Cargo.lock is committed for reproducible CI builds of the cdylib.
+target/
+# JNI libs are built by the CI Rust step (build-android-rust.sh).
+app/src/main/jniLibs/
+
+# Android
+*.apk
+*.aab
+*.keystore
+*.jks
+captures/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+
+# Local secrets
+*.env
+keystore.properties

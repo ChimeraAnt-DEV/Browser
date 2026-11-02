@@ -1,0 +1,162 @@
+name: Build Universal APK (arm64 + armv7)
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest-64-cores
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+
+      - name: Validate Gradle wrapper
+        run: ./gradlew --version
+
+      - name: Set up Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: |
+            aarch64-linux-android
+            armv7-linux-androideabi
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            bastion/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('bastion/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked --version 3.5.4
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android licenses quietly
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="$(command -v sdkmanager)"; fi
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+
+      - name: Install Android SDK components
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="$(command -v sdkmanager)"; fi
+          "$SDKMANAGER" "platforms;android-37.2" "build-tools;37.0.0" "ndk;28.2.13676358" > /dev/null
+
+      - name: Build Rust JNI libs (both ABIs)
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.2.13676358"
+          ./build-android-rust.sh
+
+      - name: Generate debug signing key (CI only, not committed)
+        run: |
+          mkdir -p keystore
+          if [ ! -f keystore/bastion.jks ]; then
+            keytool -genkeypair -v \
+              -keystore keystore/bastion.jks \
+              -alias bastion \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass android -keypass android \
+              -dname "CN=Bastion CI, OU=CI, O=Bastion, L=SF, S=CA, C=US" \
+              -noprompt
+          fi
+
+      - name: Build universal APK (debug + release)
+        run: |
+          ./gradlew :app:assembleRelease :app:assembleDebug \
+            -PBASTION_STORE_PASSWORD=android \
+            -PBASTION_KEY_ALIAS=bastion \
+            -PBASTION_KEY_PASSWORD=android
+
+      - name: Verify ABIs present in APK
+        run: |
+          APK="app/build/outputs/apk/release/app-release.apk"
+          UNZIP_DIR="${{ runner.temp }}/apk"
+          mkdir -p "$UNZIP_DIR"
+          python3 - "$APK" <<'EOF'
+          import sys, zipfile
+          apk = sys.argv[1]
+          z = zipfile.ZipFile(apk)
+          libs = [n for n in z.namelist() if n.startswith("lib/") and n.endswith(".so")]
+          elf64 = [n for n in libs if "arm64-v8a" in n]
+          elf32 = [n for n in libs if "armeabi-v7a" in n]
+          gv = ([n for n in libs if "/libxul.so" in n] or [""])[0]
+          print("lib/arm64-v8a libxul.so:", "lib/arm64-v8a/libxul.so" in libs)
+          print("lib/armeabi-v7a libxul.so:", "lib/armeabi-v7a/libxul.so" in libs)
+          print("libbastion arm64:", any("libbastion.so" in n and "arm64" in n for n in libs))
+          print("libbastion armv7:", any("libbastion.so" in n and "armeabi" in n for n in libs))
+          print("total native libs:", len(libs))
+          EOF
+
+      - name: Fail fast if either ABI is missing
+        run: |
+          python3 - <<'EOF'
+          import zipfile
+          z = zipfile.ZipFile("app/build/outputs/apk/release/app-release.apk")
+          libs = set(n.split("/")[1] for n in z.namelist() if n.startswith("lib/") and n.endswith(".so"))
+          missing = {"arm64-v8a", "armeabi-v7a"} - libs
+          if missing:
+              raise SystemExit(f"Missing ABIs in APK: {sorted(missing)}. Found: {sorted(libs)}")
+          print("OK: universal APK contains arm64-v8a and armeabi-v7a")
+          EOF
+
+      - name: Upload universal APK (release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: bastion-universal-arm64-armv7-release.apk
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload universal APK (debug)
+        uses: actions/upload-artifact@v4
+        with:
+          name: bastion-universal-arm64-armv7-debug.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload AAB (for Play distribution)
+        uses: actions/upload-artifact@v4
+        with:
+          name: bastion-release.aab
+          path: app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Show build report
+        if: always()
+        run: |
+          du -sh app/build/outputs/apk/*/*.apk app/build/outputs/bundle/release/*.aab 2>/dev/null || true

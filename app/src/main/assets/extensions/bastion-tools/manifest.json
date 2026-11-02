@@ -1,0 +1,20 @@
+{
+  "manifest_version": 2,
+  "name": "Bastion Tools",
+  "version": "1.0.0",
+  "description": "Cookie-banner removal + HTTS-upgrade hints delivered by the browser chrome.",
+  "applications": {
+    "gecko": {
+      "id": "bastion-tools@browseglass"
+    }
+  },
+  "permissions": ["<all_urls>", "tabs"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["cookie_banner.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ]
+}
