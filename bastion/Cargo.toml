@@ -1,0 +1,21 @@
+[package]
+name = "bastion"
+version = "0.1.0"
+edition = "2021"
+description = "Bastion browser core engine primitives (Rust): DoH, adblock, tab snapshot, pre-connect cache."
+
+[lib]
+name = "bastion"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# Built on Android; host tests run without JNI.
+default = []
+jni = ["dep:jni"]
+
+[dependencies]
+jni = { version = "0.21.1", optional = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]

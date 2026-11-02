@@ -1,0 +1,48 @@
+# Hand-tuned baseline profile targeting the startup hot path.
+# These classes are AOT-compiled by the OS on devices running Android 12+,
+# cutting cold-start time noticeably. Re-run `generateBaselineProfile` on a
+# device/emulator to extend this with runtime-traced coverage.
+Landroidx/compose/runtime/Composer;:
+Landroidx/compose/ui/ComposeUi;:
+Landroidx/compose/ui/platform/AndroidComposeView;:
+Landroidx/activity/ComponentActivity;:
+Landroidx/activity/compose/ComponentActivityKt;:
+Landroidx/lifecycle/LifecycleRegistry;:
+Landroidx/lifecycle/ProcessLifecycleOwner;:
+Landroidx/core/view/ViewCompat;:
+Landroidx/core/view/WindowInsetsCompat;:
+Landroidx/core/view/WindowInsetsControllerCompat;:
+Landroidx/core/view/WindowCompat;:
+Landroidx/compose/material3/SurfaceKt;:
+Landroidx/compose/material3/MaterialThemeKt;:
+Landroidx/compose/material3/NavigationBarKt;:
+Landroidx/compose/foundation/lazy/LazyListKt;:
+Landroidx/compose/foundation/lazy/grid/LazyVerticalGridKt;:
+Landroidx/compose/animation/core/Animatable;:
+Landroidx/compose/animation/core/SpringSpec;:
+Landroidx/compose/animation/AnimatedVisibilityKt;:
+Landroidx/core/widget/EdgeEffectFactory;:
+Landroidx/emoji2/text/EmojiCompat;:
+Landroidx/window/layout/WindowLayoutInfo;:
+Landroidx/window/layout/WindowMetricsCalculator;:
+Landroidx/startup/InitializationProvider;:
+Landroidx/profileinstaller/ProfileInstaller;:
+Landroidx/core/content/ContextCompat;:
+Landroidx/core/app/ActivityCompat;:
+Landroidx/core/app/NotificationCompat;:
+org/mozilla/geckoview/GeckoRuntime;:
+org/mozilla/geckoview/GeckoSession;:
+org/mozilla/geckoview/GeckoView;:
+org/mozilla/geckoview/GeckoSessionSettings;:
+org/mozilla/geckoview/GeckoRuntimeSettings;:
+org/mozilla/geckoview/GeckoResult;:
+org/mozilla/geckoview/GeckoDisplay;:
+kotlinx/coroutines/Dispatchers;:
+kotlinx/coroutines/flow/StateFlowKt;:
+com/browseglass/BastionApp;:
+com/browseglass/engine/BrowserEngine;:
+com/browseglass/engine/SessionManager;:
+com/browseglass/ui/BastionActivity;:
+com/browseglass/ui/theme/BastionTheme;:
+com/browseglass/ui/components/FloatingToolbar;:
+com/browseglass/ui/components/GlassCard;:
