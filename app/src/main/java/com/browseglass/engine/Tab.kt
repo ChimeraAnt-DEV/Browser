@@ -8,7 +8,7 @@ import android.graphics.Bitmap
 data class Tab(
     val id: Long,
     val private: Boolean,
-    val desktopMode: Boolean,
+    var desktopMode: Boolean = false,
 ) {
     var title: String = ""
     var url: String = ""

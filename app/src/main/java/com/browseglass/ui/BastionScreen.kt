@@ -1,5 +1,6 @@
 package com.browseglass.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -58,6 +59,12 @@ fun BastionScreen(host: BastionScreen) {
     val defaultEngine by prefs.defaultEngine.collectAsStateWithLifecycle(
         initialValue = com.browseglass.data.SearchEnginesStore.DEFAULT_ENGINE_NAME,
     )
+    val textScale by prefs.textScale.collectAsStateWithLifecycle(initialValue = 1f)
+
+    // Apply global text scaling to the live Gecko runtime (Phase 4.27).
+    LaunchedEffect(textScale) {
+        engine.applyAppearance(textScale)
+    }
 
     LaunchedEffect(Unit) {
         if (engine.sessions.all.isEmpty()) {
@@ -69,6 +76,16 @@ fun BastionScreen(host: BastionScreen) {
             val holder = engine.sessions.all.first()
             currentHolder.value = holder
             engine.sessions.activate(holder.tab.id)
+        }
+    }
+
+    // System-back / edge-gesture: close overlays first, then in-page back.
+    BackHandler {
+        when {
+            showTabs.value -> showTabs.value = false
+            showSettings.value -> showSettings.value = false
+            showHome.value -> showHome.value = false
+            else -> currentHolder.value?.goBack()
         }
     }
 

@@ -46,7 +46,9 @@ class BrowserEngine(
         isReady = true
 
         adjustProcessLimit()
+        applyRuntimeOptimizations()
         installMemoryPressureForwarder()
+        installBuiltInExtension()
 
         if (BastionNative.isNativeLoaded()) {
             Log.i(TAG, "native core: engine ${BastionNative.engineVersion()}, " +
@@ -124,6 +126,61 @@ class BrowserEngine(
                     onResult(false)
                 },
             )
+    }
+
+    /**
+     * Phase 4.27: apply global text scaling + font overrides to the live
+     * runtime (Gecko re-layouts with the new factor immediately).
+     */
+    fun applyAppearance(fontScale: Float, fontFamily: String = "system") {
+        val s = settings ?: return
+        val clamped = com.browseglass.data.Prefs.clampTextScale(fontScale)
+        s.setFontSizeFactor(clamped)
+        // Keep the browser's own text-size knob; disable the automatic
+        // per-site font-size adjustment so our clamp is authoritative.
+        s.setAutomaticFontSizeAdjustment(false)
+        Log.d(TAG, "applied font scale $clamped")
+    }
+
+    /**
+     * Phase 3.21 + 3.22: force Gecko to lazy-load images and throttle JS in
+     * background tabs (runs once after attach; unknown prefs are ignored).
+     */
+    fun applyRuntimeOptimizations() {
+        GeckoPreferenceController.setGeckoPref(
+            "image.lazy_loading.enabled",
+            true,
+            GeckoPreferenceController.PREF_BRANCH_DEFAULT,
+        )
+        GeckoPreferenceController.setGeckoPref(
+            "dom.image-lazy-loading.enabled",
+            true,
+            GeckoPreferenceController.PREF_BRANCH_DEFAULT,
+        )
+        // Background tab budgeting: active tab gets the CPU, hidden tabs are
+        // throttled by the process priority manager.
+        GeckoPreferenceController.setGeckoPref(
+            "dom.ipc.processPriorityManager.backgroundThrottling",
+            true,
+            GeckoPreferenceController.PREF_BRANCH_DEFAULT,
+        )
+        Log.d(TAG, "runtime optimizations applied (lazy-image, bg throttle)")
+    }
+
+    /** Phase 4.28: toggle desktop mode (UA + viewport) live on a session. */
+    fun setDesktopMode(tabId: Long, desktop: Boolean) {
+        val holder = sessions.find(tabId) ?: return
+        holder.tab.desktopMode = desktop
+        val gs = holder.session.settings
+        gs.setUserAgentMode(
+            if (desktop) GeckoSessionSettings.USER_AGENT_MODE_DESKTOP
+            else GeckoSessionSettings.USER_AGENT_MODE_MOBILE
+        )
+        gs.setViewportMode(
+            if (desktop) GeckoSessionSettings.VIEWPORT_MODE_DESKTOP
+            else GeckoSessionSettings.VIEWPORT_MODE_MOBILE
+        )
+        Log.d(TAG, "desktop-mode=$desktop on tab $tabId")
     }
 
     /* -------------------------------------------------- lifecycle */
