@@ -65,11 +65,15 @@ jobs:
 
       - name: Accept Android licenses quietly
         run: |
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="$(command -v sdkmanager)"; fi
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
 
       - name: Install Android SDK components
         run: |
-          sdkmanager "platforms;android-37.2" "build-tools;37.0.0" "ndk;28.2.13676358" > /dev/null
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="$(command -v sdkmanager)"; fi
+          "$SDKMANAGER" "platforms;android-37.2" "build-tools;37.0.0" "ndk;28.2.13676358" > /dev/null
 
       - name: Build Rust JNI libs (both ABIs)
         run: |
