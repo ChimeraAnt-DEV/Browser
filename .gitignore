@@ -8,8 +8,8 @@ local.properties
 .kotlin/
 
 # Rust / Cargo
+# Cargo.lock is committed for reproducible CI builds of the cdylib.
 target/
-Cargo.lock
 # JNI libs are built by the CI Rust step (build-android-rust.sh).
 app/src/main/jniLibs/
 
