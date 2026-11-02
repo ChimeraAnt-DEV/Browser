@@ -19,9 +19,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Tab
@@ -55,6 +56,8 @@ fun FloatingToolbar(
     focused: Boolean,
     onUrlChange: (String) -> Unit,
     onOpenTabs: () -> Unit,
+    onOpenHome: () -> Unit,
+    onOpenSettings: () -> Unit,
     onNavigate: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -89,8 +92,8 @@ fun FloatingToolbar(
         if (focused) {
             IconButtonCompat({ focusManager.clearFocus() }) { Icon(Icons.Default.Close, "Close") }
         } else {
-            IconButtonCompat({ engine.sessions.activate(engine.sessions.currentId ?: return@IconButtonCompat) }) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+            IconButtonCompat(onOpenHome) {
+                Icon(Icons.Default.Home, "Home")
             }
         }
 
@@ -124,6 +127,9 @@ fun FloatingToolbar(
         } else {
             IconButtonCompat(onOpenTabs) {
                 Icon(Icons.Default.Tab, "Tabs")
+            }
+            IconButtonCompat(onOpenSettings) {
+                Icon(Icons.Default.MoreVert, "Settings")
             }
         }
     }

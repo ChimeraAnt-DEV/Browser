@@ -72,6 +72,14 @@ class Prefs(private val context: Context) {
     suspend fun setDefaultEngine(v: String) = context.dataStore.edit { it[K.defaultEngine] = v }
     suspend fun setUserScriptsJson(v: String) = context.dataStore.edit { it[K.userScriptsJson] = v }
 
+    /** Search URL template for a chosen engine (mirrors the Rust defaults). */
+    fun searchUrlFor(engineName: String): String = when (engineName) {
+        "Google" -> "https://www.google.com/search?q={query}"
+        "Bing" -> "https://www.bing.com/search?q={query}"
+        "Brave" -> "https://search.brave.com/search?q={query}"
+        else -> "https://duckduckgo.com/?q={query}"
+    }
+
     companion object {
         const val LAYOUT_BOTTOM = "bottom"
         const val LAYOUT_TOP = "top"
@@ -88,10 +96,3 @@ class Prefs(private val context: Context) {
 object SearchEnginesStore {
     const val DEFAULT_ENGINE_NAME = "DuckDuckGo"
 }
-
-/** Serialised user scripts config (JSON). */
-data class UserScript(
-    val urlPattern: String,
-    val js: String,
-    val css: String = "",
-)

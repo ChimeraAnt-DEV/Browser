@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -15,11 +16,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.browseglass.BastionApp
+import com.browseglass.data.Prefs
 import com.browseglass.engine.GeckoSessionHolder
 import com.browseglass.ui.components.FloatingToolbar
 import com.browseglass.ui.components.Glass
 import com.browseglass.ui.components.GlassShimmer
+import com.browseglass.ui.home.HomePage
+import com.browseglass.ui.settings.SettingsScreen
 import com.browseglass.ui.tabs.TabGrid
 import dev.chrisbanes.haze.haze
 
@@ -44,9 +49,15 @@ fun BastionScreen(host: BastionScreen) {
     val engine = app.engine
 
     val showTabs = remember { mutableStateOf(false) }
+    val showSettings = remember { mutableStateOf(false) }
+    val showHome = remember { mutableStateOf(false) }
     val urlState = remember { mutableStateOf("") }
     val addressBarFocus = remember { mutableStateOf(false) }
     val currentHolder = remember { mutableStateOf<GeckoSessionHolder?>(null) }
+    val prefs = remember { Prefs(context) }
+    val defaultEngine by prefs.defaultEngine.collectAsStateWithLifecycle(
+        initialValue = com.browseglass.data.SearchEnginesStore.DEFAULT_ENGINE_NAME,
+    )
 
     LaunchedEffect(Unit) {
         if (engine.sessions.all.isEmpty()) {
@@ -98,18 +109,34 @@ fun BastionScreen(host: BastionScreen) {
             focused = addressBarFocus.value,
             onUrlChange = { urlState.value = it },
             onOpenTabs = { showTabs.value = true },
+            onOpenHome = {
+                showHome.value = !showHome.value
+                showSettings.value = false
+            },
+            onOpenSettings = {
+                showSettings.value = !showSettings.value
+                showHome.value = false
+            },
             onNavigate = { raw ->
+                val (target, isSearch) = resolveInput(raw)
+                val url = if (isSearch) {
+                    prefs.searchUrlFor(defaultEngine).replace("{query}", java.net.URLEncoder.encode(target, "UTF-8"))
+                } else {
+                    target
+                }
                 val h = currentHolder.value
                 if (h != null) {
-                    h.load(normaliseUrl(raw))
+                    h.load(url)
                 } else {
                     val holder = engine.createSession(private = false)
                     currentHolder.value = holder
                     engine.sessions.activate(holder.tab.id)
-                    holder.load(normaliseUrl(raw))
+                    holder.load(url)
                 }
                 urlState.value = ""
                 addressBarFocus.value = false
+                showHome.value = false
+                showSettings.value = false
             },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -127,6 +154,37 @@ fun BastionScreen(host: BastionScreen) {
                 },
                 onDismiss = { showTabs.value = false },
             )
+        }
+
+        if (showHome.value && !showTabs.value && !showSettings.value) {
+            androidx.compose.foundation.layout.Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF0F1220)),
+            ) {
+                HomePage(
+                    onOpen = { url ->
+                        val h = currentHolder.value
+                        if (h != null) h.load(url) else {
+                            val holder = engine.createSession(private = false)
+                            currentHolder.value = holder
+                            engine.sessions.activate(holder.tab.id)
+                            holder.load(url)
+                        }
+                        showHome.value = false
+                    },
+                )
+            }
+        }
+
+        if (showSettings.value && !showTabs.value) {
+            androidx.compose.foundation.layout.Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF0F1220)),
+            ) {
+                SettingsScreen(prefs = prefs)
+            }
         }
     }
 }
@@ -150,17 +208,22 @@ private fun GeckoSurface(
     )
 }
 
-private fun normaliseUrl(input: String): String {
+/**
+ * Splits address-bar input into a navigation target and a "this is a search"
+ * flag. Returns (url, false) for explicit URLs / hosts and (query, true) for
+ * search terms.
+ */
+private fun resolveInput(input: String): Pair<String, Boolean> {
     val trimmed = input.trim()
-    if (trimmed.isEmpty()) return "about:blank"
+    if (trimmed.isEmpty()) return "about:blank" to false
     if (trimmed.startsWith("about:") || trimmed.startsWith("data:") ||
         trimmed.startsWith("http://") || trimmed.startsWith("https://") ||
         trimmed.startsWith("file://")
     ) {
-        return trimmed
+        return trimmed to false
     }
     if (trimmed.contains(".") && !trimmed.contains(" ")) {
-        return "https://$trimmed"
+        return "https://$trimmed" to false
     }
-    return "https://duckduckgo.com/?q=${java.net.URLEncoder.encode(trimmed, "UTF-8")}"
+    return trimmed to true
 }

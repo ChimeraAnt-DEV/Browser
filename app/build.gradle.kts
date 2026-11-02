@@ -9,6 +9,8 @@ plugins {
 android {
     namespace = "com.browseglass"
     compileSdk = 37
+    // GeckoView 159 requires Android API 37.2.
+    compileSdkMinor = 2
 
     defaultConfig {
         applicationId = "com.browseglass"
@@ -62,6 +64,11 @@ android {
         compose = true
         buildConfig = true
         viewBinding = true
+    }
+    lint {
+        // Lint runs as its own CI step; do not block APK assembly on it.
+        abortOnError = false
+        checkReleaseBuilds = false
     }
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
