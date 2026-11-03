@@ -4,49 +4,37 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.Tab
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.browseglass.engine.BrowserEngine
+import com.browseglass.ui.theme.BastionPalette
 
 /**
- * Safari-style floating glass address bar, bottom-anchored. Expands with a
- * glass effect when focused, hides on scroll (via [expanded] param from the
- * screen), bouncy spring animations throughout.
+ * Modern floating navigation dock (bottom, Safari-style). A compact rounded
+ * pill holds back, home, the address search-pill, tabs and settings — floating
+ * on its own hairline-bordered material. Nothing like a 2016 full-width bar.
  */
 @Composable
 fun FloatingToolbar(
@@ -62,99 +50,106 @@ fun FloatingToolbar(
     modifier: Modifier = Modifier,
 ) {
     val focusManager = LocalFocusManager.current
-    val active = engine.sessions.all.firstOrNull { it.tab.id == engine.sessions.currentId }
 
-    // Spring-based physical resize: bouncy when focusing, gentle when idle.
     val corner by animateDpAsState(
-        targetValue = if (focused) 14.dp else 28.dp,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-        label = "toolbarCorner",
+        targetValue = if (focused) 18.dp else 30.dp,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "dockCorner",
     )
     val verticalPad by animateDpAsState(
-        targetValue = if (focused) 14.dp else 8.dp,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-        label = "toolbarPad",
+        targetValue = if (focused) 16.dp else 10.dp,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy),
+        label = "dockPad",
     )
 
     val isHttps = currentUrl.startsWith("https://")
+    val shape = RoundedCornerShape(corner)
 
     Row(
         modifier = modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 12.dp, vertical = verticalPad)
-            .height(if (focused) 56.dp else 52.dp)
-            .glassPanel(RoundedCornerShape(corner), fillAlpha = if (focused) 0.26f else 0.16f)
-            .padding(horizontal = 6.dp),
+            .padding(horizontal = 14.dp, vertical = verticalPad)
+            .height(if (focused) 60.dp else 56.dp)
+            .shadow(18.dp, shape, spotColor = Color.Black.copy(alpha = 0.4f))
+            .background(
+                Brush.verticalGradient(
+                    listOf(BastionPalette.InkRaised.copy(alpha = 0.97f), BastionPalette.Ink.copy(alpha = 0.92f))
+                ),
+                shape,
+            )
+            .border(1.dp, BastionPalette.Border, shape)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         if (focused) {
-            IconButtonCompat({ focusManager.clearFocus() }) { Icon(Icons.Default.Close, "Close") }
+            GlassIconButton(
+                icon = Icons.Default.Close,
+                contentDescription = "Close",
+                onClick = { focusManager.clearFocus() },
+                size = 38,
+            )
         } else {
-            IconButtonCompat(onOpenHome) {
-                Icon(Icons.Default.Home, "Home")
-            }
+            // Back
+            GlassIconButton(
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                onClick = {
+                    val id = engine.sessions.currentId ?: return@GlassIconButton
+                    engine.sessions.find(id)?.goBack()
+                },
+                size = 38,
+            )
+            // Home
+            GlassIconButton(
+                icon = Icons.Default.Home,
+                contentDescription = "Home",
+                onClick = onOpenHome,
+                size = 38,
+            )
         }
 
-        OutlinedTextField(
-            value = if (focused) url else displayUrl(currentUrl, active?.tab?.title),
+        SearchPill(
+            value = if (focused) url else displayUrl(currentUrl),
+            placeholder = "Search or type a URL",
+            isHttps = isHttps,
+            focused = focused,
             onValueChange = onUrlChange,
-            modifier = Modifier
-                .weight(1f)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color.White.copy(alpha = 0.06f)),
-            singleLine = true,
-            leadingIcon = {
-                Icon(
-                    if (isHttps) Icons.Default.Lock else Icons.Default.Shield,
-                    contentDescription = null,
-                    tint = if (isHttps) Color(0xFF4ADE80) else Color(0xFFFBBF24),
-                )
-            },
-            trailingIcon = {
-                if (!focused) {
-                    Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.primary)
-                }
-            },
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
-            keyboardActions = KeyboardActions(onGo = { onNavigate(url.ifEmpty { currentUrl }) }),
-            shape = RoundedCornerShape(16.dp),
+            onClick = {},
+            onGo = { onNavigate(url.ifEmpty { currentUrl }) },
+            modifier = Modifier.weight(1f),
         )
 
         if (focused) {
-            IconButtonCompat({ onNavigate(url) }) { Icon(Icons.Default.Search, "Go") }
+            GlassIconButton(
+                icon = Icons.Default.Search,
+                contentDescription = "Go",
+                onClick = { onNavigate(url.ifEmpty { currentUrl }) },
+                size = 38,
+                tint = BastionPalette.Ink,
+                background = BastionPalette.Brand,
+            )
         } else {
-            IconButtonCompat(onOpenTabs) {
-                Icon(Icons.Default.Tab, "Tabs")
-            }
-            IconButtonCompat(onOpenSettings) {
-                Icon(Icons.Default.MoreVert, "Settings")
-            }
+            // Tabs
+            GlassIconButton(
+                icon = Icons.Default.GridView,
+                contentDescription = "Tabs",
+                onClick = onOpenTabs,
+                size = 38,
+            )
+            // Settings
+            GlassIconButton(
+                icon = Icons.Default.Tune,
+                contentDescription = "Settings",
+                onClick = onOpenSettings,
+                size = 38,
+            )
         }
     }
 }
 
-@Composable
-private fun IconButtonCompat(onClick: () -> Unit, icon: @Composable () -> Unit) {
-    androidx.compose.material3.IconButton(
-        onClick = onClick,
-        modifier = Modifier
-            .size(38.dp)
-            .clip(CircleShape),
-    ) {
-        boxIcon(icon)
-    }
-}
-
-@Composable
-private fun boxIcon(icon: @Composable () -> Unit) {
-    androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
-        icon()
-    }
-}
-
-fun displayUrl(currentUrl: String, title: String?): String {
+fun displayUrl(currentUrl: String): String {
     if (currentUrl.isEmpty()) return ""
     if (currentUrl.startsWith("https://")) {
         val rest = currentUrl.removePrefix("https://")
