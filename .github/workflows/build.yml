@@ -18,7 +18,10 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest-64-cores
+    # `ubuntu-latest-64-cores` requires an org/enterprise larger-runner group;
+    # a standard repo gets no runner for that label, so we use the standard
+    # hosted image and keep the job under the default 6h limit.
+    runs-on: ubuntu-latest
     timeout-minutes: 60
 
     steps:
@@ -69,11 +72,14 @@ jobs:
           if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="$(command -v sdkmanager)"; fi
           yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
 
+      # Build-tools 37.0.0 does not exist in Google's repository — the newest
+      # published build-tools is 36.0.0, which is exactly what AGP 9.5 needs.
       - name: Install Android SDK components
         run: |
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="$(command -v sdkmanager)"; fi
-          "$SDKMANAGER" "platforms;android-37.2" "build-tools;37.0.0" "ndk;28.2.13676358" > /dev/null
+          # AGP resolves compileSdk 37.2 to platform android-37.2.
+          "$SDKMANAGER" "platforms;android-37.2" "platform-tools" "build-tools;36.0.0" "ndk;28.2.13676358" > /dev/null
 
       - name: Build Rust JNI libs (both ABIs)
         run: |
@@ -93,9 +99,9 @@ jobs:
               -noprompt
           fi
 
-      - name: Build universal APK (debug + release)
+      - name: Build universal APK (debug + release) and AAB
         run: |
-          ./gradlew :app:assembleRelease :app:assembleDebug \
+          ./gradlew :app:assembleRelease :app:assembleDebug :app:bundleRelease \
             -PBASTION_STORE_PASSWORD=android \
             -PBASTION_KEY_ALIAS=bastion \
             -PBASTION_KEY_PASSWORD=android
