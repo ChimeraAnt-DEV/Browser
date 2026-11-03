@@ -63,23 +63,21 @@ jobs:
       - name: Install cargo-ndk
         run: cargo install cargo-ndk --locked --version 3.5.4
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept Android licenses quietly
+      # ubuntu-latest already ships a full Android SDK at $ANDROID_HOME
+      # (/usr/local/lib/android/sdk). android-actions/setup-android@v3 is
+      # deprecated and broken on current images (it tries to install the
+      # removed `tools` package), so we use the preinstalled SDK directly.
+      - name: Setup Android SDK (preinstalled) and install components
         run: |
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="$(command -v sdkmanager)"; fi
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 3 -name sdkmanager -type f 2>/dev/null | sort -V | tail -1)"
+          [ -n "$SDKMANAGER" ] || SDKMANAGER="$(command -v sdkmanager || true)"
+          [ -n "$SDKMANAGER" ] || { echo "FATAL: sdkmanager not found"; exit 1; }
+          echo "Using SDKMANAGER: $SDKMANAGER"
           yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
-
-      # Build-tools 37.0.0 does not exist in Google's repository — the newest
-      # published build-tools is 36.0.0, which is exactly what AGP 9.5 needs.
-      - name: Install Android SDK components
-        run: |
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="$(command -v sdkmanager)"; fi
+          # Build-tools 37.0.0 does not exist in Google's repository — the
+          # newest published build-tools is 36.0.0 (AGP 9.5's default).
           # AGP resolves compileSdk 37.2 to platform android-37.2.
-          "$SDKMANAGER" "platforms;android-37.2" "platform-tools" "build-tools;36.0.0" "ndk;28.2.13676358" > /dev/null
+          yes | "$SDKMANAGER" "platforms;android-37.2" "platform-tools" "build-tools;36.0.0" "ndk;28.2.13676358"
 
       - name: Build Rust JNI libs (both ABIs)
         run: |
